@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	etcdtlsutil "go.etcd.io/etcd/pkg/tlsutil"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/util/cert"
@@ -282,6 +283,23 @@ func DefaultCiphers() []uint16 {
 		tls.TLS_RSA_WITH_AES_128_CBC_SHA, // forbidden by http/2
 		tls.TLS_RSA_WITH_AES_256_CBC_SHA, // forbidden by http/2
 	}
+}
+
+// WhitelistEtcdCipherSuites takes a list of cipher suites and returns etcd whitelist
+// along with a list of any unsupported ciphers removed.
+// TODO hexfusion move to upstream etcd
+func WhitelistEtcdCipherSuites(cipherSuites []string) ([]string, []string){
+	whitelist := []string{}
+	unsupportedCiphers := []string{}
+	for _, cipher := range cipherSuites {
+		_, ok := etcdtlsutil.GetCipherSuite(cipher)
+		if !ok {
+			unsupportedCiphers = append(unsupportedCiphers, cipher)
+			continue
+		}
+		whitelist = append(whitelist, cipher)
+	}
+	return whitelist, unsupportedCiphers
 }
 
 // SecureTLSConfig enforces the default minimum security settings for the cluster.

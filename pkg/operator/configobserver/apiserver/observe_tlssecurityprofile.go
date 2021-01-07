@@ -63,11 +63,16 @@ func innerTLSSecurityProfileObservations(genericListers configobserver.Listers, 
 		return existingConfig, append(errs, err)
 	}
 
+	// whitelist etcd ciphers
+	whitelistEtcdCipherSuites, unsupportedEtcdCipherSuites := crypto.WhitelistEtcdCipherSuites(observedCipherSuites)
+	if len(unsupportedEtcdCipherSuites) > 0 {
+		recorder.Eventf("ObserveTLSSecurityProfile", "unsupported etcd cipherSuites removed %q", unsupportedEtcdCipherSuites)
+	}
 	if observedMinTLSVersion != currentMinTLSVersion {
 		recorder.Eventf("ObserveTLSSecurityProfile", "minTLSVersion changed to %s", observedMinTLSVersion)
 	}
-	if !reflect.DeepEqual(observedCipherSuites, currentCipherSuites) {
-		recorder.Eventf("ObserveTLSSecurityProfile", "cipherSuites changed to %q", observedCipherSuites)
+	if !reflect.DeepEqual(whitelistEtcdCipherSuites, currentCipherSuites) {
+		recorder.Eventf("ObserveTLSSecurityProfile", "cipherSuites changed to %q", whitelistEtcdCipherSuites)
 	}
 
 	return observedConfig, errs
@@ -75,7 +80,7 @@ func innerTLSSecurityProfileObservations(genericListers configobserver.Listers, 
 
 // Extracts the minimum TLS version and cipher suites from TLSSecurityProfile object,
 // Converts the ciphers to IANA names as supported by Kube ServingInfo config.
-// If profile is nil, returns config defined by the Intermediate TLS Profile
+// If profile is nil, returns config defined by the Intermediate TLS Profile.
 func getSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []string) {
 	var profileType configv1.TLSProfileType
 	if profile == nil {
@@ -101,3 +106,4 @@ func getSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []
 	// need to remap all Ciphers to their respective IANA names used by Go
 	return string(profileSpec.MinTLSVersion), crypto.OpenSSLToIANACipherSuites(profileSpec.Ciphers)
 }
+
